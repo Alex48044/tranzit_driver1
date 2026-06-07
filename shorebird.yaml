@@ -1,0 +1,8 @@
+# Shorebird configuration
+app_id: tranzit_app
+
+# Android package name
+android_package_name: com.example.tranzit
+
+# iOS bundle identifier
+ios_bundle_identifier: com.example.tranzit

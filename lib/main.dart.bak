@@ -1,0 +1,254 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+void main() => runApp(TranzitApp());
+
+const String SERVER_IP = "192.168.12.1";
+const String API_URL = "http://$SERVER_IP:8080";
+
+class TranzitApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'ТРАНЗИТ',
+      theme: ThemeData.dark().copyWith(primaryColor: Colors.orange),
+      home: SplashScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  @override
+  _SplashScreenState createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLogin();
+  }
+
+  void _checkLogin() async {
+    await Future.delayed(Duration(seconds: 1));
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token != null) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainScreen()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
+              child: Center(child: Text('Т', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black))),
+            ),
+            SizedBox(height: 20),
+            CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  bool _isCodeSent = false;
+  String _generatedCode = '1234';
+
+  void _sendCode() {
+    if (_phoneController.text.length >= 10) setState(() => _isCodeSent = true);
+  }
+
+  void _login() async {
+    if (_codeController.text == _generatedCode) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', 'fake_token_123');
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainScreen()));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Неверный код')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('ТРАНЗИТ', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.orange)),
+            SizedBox(height: 40),
+            TextField(controller: _phoneController, decoration: InputDecoration(labelText: 'Номер телефона'), keyboardType: TextInputType.phone),
+            SizedBox(height: 16),
+            if (!_isCodeSent)
+              ElevatedButton(onPressed: _sendCode, child: Text('Получить код'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange)),
+            if (_isCodeSent) ...[
+              TextField(controller: _codeController, decoration: InputDecoration(labelText: 'Код из СМС'), keyboardType: TextInputType.number),
+              SizedBox(height: 16),
+              ElevatedButton(onPressed: _login, child: Text('Войти'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  @override
+  _MainScreenState createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _currentIndex = 0;
+  final List<Widget> _screens = [OrdersScreen(), ProfileScreen()];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Заявки'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Профиль'),
+        ],
+      ),
+    );
+  }
+}
+
+class OrdersScreen extends StatefulWidget {
+  @override
+  _OrdersScreenState createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends State<OrdersScreen> {
+  List<Map<String, dynamic>> orders = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  void _loadOrders() async {
+    try {
+      final response = await http.get(Uri.parse('$API_URL/orders.json'));
+      if (response.statusCode == 200) {
+        setState(() {
+          orders = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+        });
+      }
+    } catch (e) {
+      setState(() {
+        orders = [
+          {'id': 'ORD-001', 'pickup': 'ул. Ленина, 10', 'delivery': 'ул. Пушкина, 20', 'cargo': 'Коробка 10кг', 'price': 900},
+        ];
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Заявки')),
+      body: orders.isEmpty
+          ? Center(child: Text('Нет заявок'))
+          : ListView.builder(
+              itemCount: orders.length,
+              itemBuilder: (context, index) {
+                final o = orders[index];
+                return Card(
+                  margin: EdgeInsets.all(8),
+                  child: ListTile(
+                    title: Text(o['id']),
+                    subtitle: Text('${o['pickup']} → ${o['delivery']}\n📦 ${o['cargo']} | 💰 ${o['price']} руб'),
+                    trailing: ElevatedButton(
+                      onPressed: () => _bidOnOrder(o['id']),
+                      child: Text('Предложить цену'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _bidOnOrder(String orderId) {
+    TextEditingController priceController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Предложить цену'),
+        content: TextField(controller: priceController, decoration: InputDecoration(labelText: 'Сумма в рублях'), keyboardType: TextInputType.number),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Отмена')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Предложение отправлено')));
+            },
+            child: Text('Отправить'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ProfileScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Профиль')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(radius: 50, backgroundColor: Colors.orange, child: Text('В', style: TextStyle(fontSize: 40))),
+            SizedBox(height: 20),
+            Text('Водитель', style: TextStyle(fontSize: 24)),
+            SizedBox(height: 10),
+            Text('+7 999 123-45-67', style: TextStyle(color: Colors.grey)),
+            SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
+              },
+              child: Text('Выйти'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

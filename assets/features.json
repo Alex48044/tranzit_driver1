@@ -1,0 +1,14 @@
+{
+  "features": [
+    {"id": "gps", "name": "GPS трекинг", "enabled": false},
+    {"id": "maps", "name": "Карты и маршруты", "enabled": false},
+    {"id": "calls", "name": "Звонок диспетчеру", "enabled": false},
+    {"id": "chat", "name": "Чат с диспетчером", "enabled": false},
+    {"id": "push", "name": "Пуш-уведомления", "enabled": false},
+    {"id": "history", "name": "История поездок", "enabled": false},
+    {"id": "finance", "name": "Финансы", "enabled": false},
+    {"id": "support", "name": "Поддержка", "enabled": false},
+    {"id": "rating", "name": "Рейтинг", "enabled": false},
+    {"id": "sms", "name": "СМС уведомления", "enabled": true}
+  ]
+}
