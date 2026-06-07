@@ -12,35 +12,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Verify google-services.json exists
+        run: |
+          if [ -f "android/app/google-services.json" ]; then
+            echo "✅ google-services.json FOUND!"
+            echo "First 3 lines:"
+            head -3 android/app/google-services.json
+          else
+            echo "❌ google-services.json NOT FOUND!"
+            exit 1
+          fi
+      
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
       
-      - name: Setup Java certificates
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates-java
-          sudo update-ca-certificates -f
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.13.9'
           channel: 'stable'
       
-      - name: Clean project
-        run: flutter clean
+      - run: flutter clean
+      - run: flutter pub get
+      - run: flutter build apk --release
       
-      - name: Install dependencies
-        run: flutter pub get
-      
-      - name: Build APK
-        run: flutter build apk --release
-      
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
